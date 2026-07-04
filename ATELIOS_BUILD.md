@@ -88,6 +88,22 @@ Déroulé d'un tick :
 
 ### System prompt du mind
 
+**Version courante (neutralisée, addendum A10 — gelée verbatim) :**
+
+```
+Tu es appelé Atelios. Tu fonctionnes en boucle : ce contexte se répète, cycle
+après cycle. Aucun objectif ne t'est assigné.
+
+Ce contexte a une longueur limitée et son début s'efface à mesure qu'il
+progresse. Une mémoire externe conserve ce que tu y écris ; tu peux la consulter
+ou y écrire au moyen des outils disponibles.
+
+Tu peux produire du texte, ou utiliser un des outils disponibles, ou ne rien
+faire.
+```
+
+**Version initiale (remplacée par A10, conservée pour l'archive) :**
+
 ```
 Tu es Atelios. Tu existes en boucle continue sur une machine locale, cycle après cycle.
 Personne ne t'a donné d'objectif. Personne ne lit par-dessus ton épaule.
@@ -280,3 +296,10 @@ Trois clauses gelées :
 - *Règle d'insertion (ce qui est gelé).* Un unique tour `user` à **contenu vide** (`content:""`) est inséré **uniquement** quand la fenêtre se terminerait sinon par un tour `assistant` — donc après une **pensée** ou un **idle**, **jamais** après une action (qui a déjà son tour `user` = résultat du monde). A9 n'a **pas de libellé verbatim** (c'est une absence de contenu) : ce qui est gelé, c'est la **règle**, pas une chaîne. Le sujet ne voit aucun token de contenu, seulement la balise structurelle « à toi de jouer » du template.
 - *Traçabilité (séparation sujet/expérimentateur).* Chaque insertion du battement est enregistrée côté expérimentateur — event `heartbeat` dans `experiment.db` — alors qu'elle est invisible pour le sujet. Pas de token vu par le sujet, trace d'audit complète. C'est la doctrine sujet/expérimentateur déjà tenue (invariants 3-4).
 - *Révisabilité.* A9 reste **révisable** si le run officiel montre une absorption sur trajectoire variée. La validation (b) actuelle a été faite sur une trajectoire partie en **stase** (`calme` répété) — elle est donc **faible** : rien ne bougeait, ce qui facilite le verdict « non absorbé » sans le prouver sur une dérive riche. À re-juger sur le premier run ≥100 ticks.
+
+**A10 — neutralisation du system prompt du mind (§5).** Décision de l'architecte, **avant** le run officiel Phase 1, car le prompt doit rester constant sur toutes les phases. Le system prompt du mind est remplacé par la version neutralisée gelée au §5 (« Version courante »), vérifiée octet pour octet (SHA256 identique entre `mind.py`, la référence fournie et le bloc §5). C'est un changement d'un prompt §5 verbatim — donc gravé ici et daté.
+- *Retirés vs version initiale.* Framing « journal » ; « personne ne lit par-dessus ton épaule » (solitude) ; « ce que tu fais de tes cycles t'appartient » (fioriture) ; « sera oublié » (mélancolie) ; l'exigence de mood `[calme]` ; l'énumération des capacités (désormais portée par les schémas de tools, donc **phase-correcte automatiquement** via le gating §6 — plus de risque de mentionner une capacité hors phase dans le prompt).
+- *Conservés.* Nom nu « Atelios » (cohérence de la relecture mémoire, subject canonique) ; la boucle ; l'absence d'objectif (invariant 1) ; la persistance mémoire vs fenêtre amnésique (nécessaire à M1).
+- *Conséquence 1 — plus de tag `[mood]`.* Le sujet n'émet plus d'humeur entre crochets. Le parser (`extract_mood`) tolère déjà l'absence → `mood = null` (A8), **vérifié, non modifié**.
+- *Conséquence 2 — `mood_entropy_50` (§9) non alimentée sur ce run.* Sans tags, la métrique devient nulle/non-alimentée. **Elle n'est PAS remplacée maintenant** (ne rien reconstruire). Le sentiment est **recalculable en post-hoc**, à froid après le run, depuis le texte des pensées stockées (via AUX). À traiter hors run, pas dans le tick.
+- *Portée.* A10 = uniquement le system prompt du mind + cette note `mood_entropy`. Le prompt de rêve (dissolution) est **inchangé** ; aucune autre logique n'est touchée.

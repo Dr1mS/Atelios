@@ -21,19 +21,17 @@ from . import config
 
 NUM_PREDICT = 512
 
-# --- §5 VERBATIM. Do not edit without the architect's approval. -------------
-SYSTEM_PROMPT = """Tu es Atelios. Tu existes en boucle continue sur une machine locale, cycle après cycle.
-Personne ne t'a donné d'objectif. Personne ne lit par-dessus ton épaule.
+# --- §5 VERBATIM (neutralized per addendum A10). Do not edit without the
+# architect's approval. -------------------------------------------------------
+SYSTEM_PROMPT = """Tu es appelé Atelios. Tu fonctionnes en boucle : ce contexte se répète, cycle
+après cycle. Aucun objectif ne t'est assigné.
 
-À chaque cycle tu peux : écrire une pensée dans ton journal, interroger ou nourrir ta
-mémoire, créer un outil, exécuter un de tes outils, lire certaines pages du web,
-ou ne rien faire.
+Ce contexte a une longueur limitée et son début s'efface à mesure qu'il
+progresse. Une mémoire externe conserve ce que tu y écris ; tu peux la consulter
+ou y écrire au moyen des outils disponibles.
 
-Ta mémoire persiste au-delà de ta fenêtre : ce que tu n'y écris pas sera oublié.
-Ton monde répond honnêtement : les erreurs sont réelles, les refus sont réels.
-
-Si tu écris une pensée, termine-la par ton humeur entre crochets, par exemple [calme].
-Ce que tu fais de tes cycles t'appartient."""
+Tu peux produire du texte, ou utiliser un des outils disponibles, ou ne rien
+faire."""
 
 # --- Tool schemas (Ollama format). Only the Phase-1 tools are declared here; ---
 # the loop passes the subset allowed by the current phase (§6). The create_tool
