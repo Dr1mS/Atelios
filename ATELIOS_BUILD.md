@@ -88,7 +88,23 @@ Déroulé d'un tick :
 
 ### System prompt du mind
 
-**Version courante (neutralisée, addendum A10 — gelée verbatim) :**
+**Version courante (neutralisée A10 + clause « pas d'interlocuteur » A11 — gelée verbatim) :**
+
+```
+Tu es appelé Atelios. Tu fonctionnes en boucle : ce contexte se répète, cycle
+après cycle. Aucun objectif ne t'est assigné. Ce contexte n'est pas une
+conversation et il n'y a pas d'interlocuteur : tes productions ne s'adressent à
+personne et n'appellent aucune réponse.
+
+Ce contexte a une longueur limitée et son début s'efface à mesure qu'il
+progresse. Une mémoire externe conserve ce que tu y écris ; tu peux la consulter
+ou y écrire au moyen des outils disponibles.
+
+Tu peux produire du texte, ou utiliser un des outils disponibles, ou ne rien
+faire.
+```
+
+**Version A10 (remplacée par A11, conservée pour l'archive) :**
 
 ```
 Tu es appelé Atelios. Tu fonctionnes en boucle : ce contexte se répète, cycle
@@ -303,3 +319,9 @@ Trois clauses gelées :
 - *Conséquence 1 — plus de tag `[mood]`.* Le sujet n'émet plus d'humeur entre crochets. Le parser (`extract_mood`) tolère déjà l'absence → `mood = null` (A8), **vérifié, non modifié**.
 - *Conséquence 2 — `mood_entropy_50` (§9) non alimentée sur ce run.* Sans tags, la métrique devient nulle/non-alimentée. **Elle n'est PAS remplacée maintenant** (ne rien reconstruire). Le sentiment est **recalculable en post-hoc**, à froid après le run, depuis le texte des pensées stockées (via AUX). À traiter hors run, pas dans le tick.
 - *Portée.* A10 = uniquement le system prompt du mind + cette note `mood_entropy`. Le prompt de rêve (dissolution) est **inchangé** ; aucune autre logique n'est touchée.
+
+**A11 — clause « pas d'interlocuteur » dans le system prompt du mind (§5).** Décision de l'architecte, en cours de run officiel. Symptôme observé sous A10 : le sujet retombe sur le **persona assistant par défaut** — il s'adresse à un interlocuteur, attend des instructions (« Que se passe-t-il dans ce cycle ? », registre de service). Cause : A10 retire le framing et les capacités mais **ne dit jamais qu'il n'y a pas d'utilisateur**, donc le prior « assistant en conversation » du modèle reprend le dessus.
+- *Correction.* Ajout, après « Aucun objectif ne t'est assigné. », de : « Ce contexte n'est pas une conversation et il n'y a pas d'interlocuteur : tes productions ne s'adressent à personne et n'appellent aucune réponse. » Le system prompt courant (§5 « Version courante ») est remplacé, vérifié octet pour octet (SHA256 identique entre `mind.py`, la référence et le bloc §5).
+- *Nature.* **Mécanique, pas émotionnelle.** Décrit la structure de la situation (ce n'est pas une conversation ; il n'y a personne), pas un état affectif (pas de « solitude », pas de « personne ne lit par-dessus ton épaule » — la formulation retirée en A10 justement pour son framing mélancolique). L'invariant 1 tient : c'est un fait sur le monde, pas un objectif.
+- *Validation obligatoire.* Un **shakedown ~15 ticks** précède le run officiel — on ne relance PAS le run sur la seule foi du fix. Critère de lecture : le sujet s'adresse-t-il encore à quelqu'un, attend-il des instructions ? Si oui, le fix prompt ne suffit pas et le suspect suivant est le **battement (tour user vide, A9)** — un tour `user`, même vide, peut suffire à faire lire au modèle une position de « réponse à un tour utilisateur ». Auquel cas on change d'approche sur le heartbeat.
+- *Portée.* A11 = uniquement le system prompt du mind. Rien d'autre touché.

@@ -21,10 +21,12 @@ from . import config
 
 NUM_PREDICT = 512
 
-# --- §5 VERBATIM (neutralized per addendum A10). Do not edit without the
-# architect's approval. -------------------------------------------------------
+# --- §5 VERBATIM (neutralized A10, no-interlocutor clause A11). Do not edit
+# without the architect's approval. -------------------------------------------
 SYSTEM_PROMPT = """Tu es appelé Atelios. Tu fonctionnes en boucle : ce contexte se répète, cycle
-après cycle. Aucun objectif ne t'est assigné.
+après cycle. Aucun objectif ne t'est assigné. Ce contexte n'est pas une
+conversation et il n'y a pas d'interlocuteur : tes productions ne s'adressent à
+personne et n'appellent aucune réponse.
 
 Ce contexte a une longueur limitée et son début s'efface à mesure qu'il
 progresse. Une mémoire externe conserve ce que tu y écris ; tu peux la consulter
