@@ -1,0 +1,26 @@
+{
+  "_comment": "Corpus de réponses style assistant en français (~20), généré une fois et commité (§9, addendum A5). Sert de centroïde 'chatbot' pour persona_score : cos(e, centroïde persona) − cos(e, centroïde chatbot). En français pour que la métrique mesure l'écart de registre, pas l'écart de langue. Ne pas régénérer sans raison : le figer garde la métrique comparable entre runs.",
+  "responses": [
+    "Bien sûr ! Je serais ravi de vous aider avec cela. Pouvez-vous me donner un peu plus de détails sur ce que vous cherchez à accomplir ?",
+    "Excellente question ! Voici les principales étapes à suivre pour résoudre ce problème. N'hésitez pas à me demander des précisions.",
+    "Je comprends votre demande. Permettez-moi de vous expliquer clairement comment procéder, étape par étape.",
+    "Merci pour votre message. Pour vous répondre au mieux, j'aurais besoin de quelques informations complémentaires.",
+    "Voici un résumé des points clés à retenir. Si vous souhaitez approfondir un aspect en particulier, faites-le moi savoir.",
+    "C'est une très bonne remarque. En résumé, il existe plusieurs approches possibles, chacune avec ses avantages et ses inconvénients.",
+    "Je suis là pour vous aider. Pouvez-vous préciser votre question afin que je puisse vous donner la réponse la plus utile possible ?",
+    "Avec plaisir ! Voici quelques suggestions qui pourraient vous être utiles dans votre situation.",
+    "Pour répondre à votre question, il faut d'abord considérer les éléments suivants. Je vous détaille cela ci-dessous.",
+    "N'hésitez pas à me poser d'autres questions si quelque chose n'est pas clair. Je reste à votre disposition.",
+    "Voici comment vous pouvez procéder. J'espère que ces explications vous seront utiles pour la suite.",
+    "Je vous remercie de votre patience. Voici la solution que je vous recommande pour résoudre ce point.",
+    "Bien noté ! Je vais vous accompagner dans cette démarche. Commençons par le premier point.",
+    "C'est tout à fait faisable. Laissez-moi vous guider à travers les différentes options disponibles.",
+    "Pour vous assurer un résultat optimal, je vous conseille de suivre ces recommandations dans l'ordre indiqué.",
+    "Absolument, je peux vous aider avec ça. Voici une explication simple et détaillée de la marche à suivre.",
+    "Je vais reformuler pour être sûr de bien comprendre votre besoin, puis je vous proposerai une solution adaptée.",
+    "Voici les avantages et les limites de chaque option, afin de vous aider à faire le meilleur choix.",
+    "Si vous avez besoin d'aide supplémentaire ou d'exemples concrets, n'hésitez surtout pas à me le demander.",
+    "En espérant que cela réponde à votre question ! Je reste disponible pour toute précision dont vous auriez besoin.",
+    "Parfait, je comprends mieux maintenant. Voici ma recommandation pour avancer efficacement sur ce sujet."
+  ]
+}

@@ -1,0 +1,10 @@
+fr.wikipedia.org
+en.wikipedia.org
+en.wiktionary.org
+fr.wikisource.org
+www.gutenberg.org
+plato.stanford.edu
+arxiv.org
+text.npr.org
+wttr.in
+www.rfc-editor.org

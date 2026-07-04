@@ -1,0 +1,28 @@
+# Secrets / env
+.env
+
+# Experiment data (regenerated per run)
+experiment.db
+experiment.db-wal
+experiment.db-shm
+data/mnemos_queue.jsonl
+
+# Sandbox is the jail — code Atelios writes lives here, not in git
+sandbox/tools/*
+sandbox/workspace/*
+!sandbox/.gitkeep
+!sandbox/tools/.gitkeep
+!sandbox/workspace/.gitkeep
+
+# Virtualenvs
+.venv/
+venv/
+sandbox_venv/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Backups
+*.zip

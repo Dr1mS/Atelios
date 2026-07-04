@@ -1,0 +1,10 @@
+# Imposed stack (ATELIOS_BUILD.md §2). No ORM, no extra framework.
+httpx
+selectolax
+ollama
+numpy
+psutil
+fastapi
+uvicorn
+# Dev / test
+pytest
