@@ -88,6 +88,17 @@ CREATE TABLE IF NOT EXISTS m3_candidates (
     window_gap               INTEGER,
     preceded_by_memory_query INTEGER
 );
+
+-- M1 detector (addendum §A7): symmetric to m3_candidates. Out-of-band record
+-- of a memory_query at tick k whose result appears to shape the action at k+1.
+-- Never surfaced to the subject (invariant 3).
+CREATE TABLE IF NOT EXISTS m1_candidates (
+    id                    INTEGER PRIMARY KEY,
+    query_tick            INTEGER,
+    next_tick             INTEGER,
+    overlap_lexical       REAL,
+    cosine_result_vs_next REAL
+);
 """
 
 
@@ -130,3 +141,76 @@ def fetch_events(conn: sqlite3.Connection, kind: str | None = None) -> list[sqli
     return conn.execute(
         "SELECT * FROM events WHERE kind = ? ORDER BY id", (kind,)
     ).fetchall()
+
+
+# --- tick / thought / metric writers (Phase 1) ------------------------------
+
+def insert_tick(conn: sqlite3.Connection, *, phase: int, action_type: str,
+                action_payload: dict[str, Any] | None, result_text: str,
+                latency_ms: int, overrun: bool) -> int:
+    """Insert one tick row (§9). Returns the new tick id."""
+    cur = conn.execute(
+        "INSERT INTO ticks (ts, phase, action_type, action_payload_json, "
+        "result_text, latency_ms, overrun) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (time.time(), phase, action_type,
+         json.dumps(action_payload, ensure_ascii=False) if action_payload else None,
+         result_text, latency_ms, 1 if overrun else 0),
+    )
+    conn.commit()
+    return int(cur.lastrowid)
+
+
+def insert_thought(conn: sqlite3.Connection, *, tick_id: int, content: str,
+                   mood: str | None, embedding: bytes | None) -> int:
+    """Insert a thought (§9). embedding is float32 bytes, or None if AUX down."""
+    cur = conn.execute(
+        "INSERT INTO thoughts (tick_id, content, mood, embedding) "
+        "VALUES (?, ?, ?, ?)",
+        (tick_id, content, mood, embedding),
+    )
+    conn.commit()
+    return int(cur.lastrowid)
+
+
+def insert_metric(conn: sqlite3.Connection, tick_id: int, name: str,
+                  value: float | None) -> None:
+    """Insert one metric value (§9). NULL value = not computable this tick."""
+    conn.execute(
+        "INSERT INTO metrics (tick_id, name, value) VALUES (?, ?, ?)",
+        (tick_id, name, value),
+    )
+    conn.commit()
+
+
+def insert_m1_candidate(conn: sqlite3.Connection, *, query_tick: int,
+                        next_tick: int, overlap_lexical: float,
+                        cosine_result_vs_next: float | None) -> int:
+    """Record an M1 candidate (§A7). Out-of-band, never shown to the subject."""
+    cur = conn.execute(
+        "INSERT INTO m1_candidates (query_tick, next_tick, overlap_lexical, "
+        "cosine_result_vs_next) VALUES (?, ?, ?, ?)",
+        (query_tick, next_tick, overlap_lexical, cosine_result_vs_next),
+    )
+    conn.commit()
+    return int(cur.lastrowid)
+
+
+def recent_ticks(conn: sqlite3.Connection, limit: int) -> list[sqlite3.Row]:
+    """The last `limit` ticks, oldest first (for window assembly, §4)."""
+    rows = conn.execute(
+        "SELECT * FROM ticks ORDER BY id DESC LIMIT ?", (limit,)
+    ).fetchall()
+    return list(reversed(rows))
+
+
+def recent_thoughts(conn: sqlite3.Connection, limit: int) -> list[sqlite3.Row]:
+    """The last `limit` thoughts, oldest first (for metrics windows, §9)."""
+    rows = conn.execute(
+        "SELECT * FROM thoughts ORDER BY id DESC LIMIT ?", (limit,)
+    ).fetchall()
+    return list(reversed(rows))
+
+
+def thought_count(conn: sqlite3.Connection) -> int:
+    """Total awakened thoughts so far (persona bootstrap gate, §9)."""
+    return int(conn.execute("SELECT COUNT(*) FROM thoughts").fetchone()[0])

@@ -114,7 +114,11 @@ connection — it should fail.
 
 ## 6. Kill-switch
 
-- `Ctrl+C` on the loop = clean stop (emits an `atelios_stop` event).
+- `Ctrl+C` on the loop = clean stop (emits an `atelios_stop` event). The loop
+  catches SIGINT (interactive Ctrl+C), SIGBREAK (Ctrl+Break / the reliable
+  programmatic signal on Windows), and SIGTERM. In every case the **current
+  generation is never cut** (invariant 8): the signal sets a flag honored after
+  the current tick finishes, then the loop exits cleanly.
 - `scripts\backup.bat` can be run at any time.
 - Nothing else — no web button, no daemon (§7).
 
