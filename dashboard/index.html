@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atelios — console d'observation</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root {
+    --bg: #0a0c10;          /* server-room near-black, faint blue */
+    --panel: #10141b;
+    --line: #1b2530;
+    --ink: #9fb2ad;         /* faint phosphor grey-green */
+    --ink-dim: #566169;
+    --ink-bright: #d6e4df;
+    --amber: #d99a4e;       /* the single accent: notable events, M1, overrun */
+    --stasis: #7a4b52;      /* loop_score crossing the stasis threshold */
+  }
+  html, body { background: var(--bg); color: var(--ink);
+    font-family: ui-monospace, "JetBrains Mono", "SFMono-Regular", "Consolas", monospace; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--line); }
+  ::-webkit-scrollbar-track { background: transparent; }
+  .panel { background: var(--panel); border: 1px solid var(--line); }
+  .grain::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .015;
+    background-image: repeating-linear-gradient(0deg, #fff 0, #fff 1px, transparent 1px, transparent 3px);
+  }
+  .tick-enter { animation: fade .5s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(-2px); } to { opacity: 1; } }
+  .cursor::after { content: "▍"; color: var(--amber); animation: blink 1.1s step-end infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    .tick-enter, .cursor::after { animation: none; }
+  }
+</style>
+</head>
+<body class="grain">
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+const STASIS = 0.9;               // §9 stasis threshold on loop_score
+const POLL_MS = 10000;            // §11: poll 10s, no websocket
+
+async function jget(path) {
+  const r = await fetch(path);
+  if (!r.ok) throw new Error(path + " -> " + r.status);
+  return r.json();
+}
+
+function fmtTime(ts) {
+  if (!ts) return "—";
+  const d = new Date(ts * 1000);
+  return d.toLocaleTimeString("fr-FR", { hour12: false });
+}
+function ago(ts) {
+  if (!ts) return "";
+  const s = Math.max(0, Math.floor(Date.now() / 1000 - ts));
+  if (s < 60) return s + "s";
+  if (s < 3600) return Math.floor(s / 60) + "m";
+  return Math.floor(s / 3600) + "h";
+}
+
+// ── Header: run vitals ──────────────────────────────────────────────
+function Header({ s }) {
+  if (!s) return null;
+  const live = s.running;
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-8 gap-y-2 px-5 py-4 border-b"
+         style={{ borderColor: "var(--line)" }}>
+      <div className="flex items-baseline gap-3">
+        <span className="text-sm tracking-[0.3em]" style={{ color: "var(--ink-bright)" }}>ATELIOS</span>
+        <span className="text-xs" style={{ color: "var(--ink-dim)" }}>console d'observation</span>
+      </div>
+      <Vital label="phase" value={s.phase ?? "—"} />
+      <Vital label="cycles" value={s.ticks} />
+      <Vital label="pensées" value={s.thoughts} />
+      <Vital label="M1" value={s.m1_candidates} accent={s.m1_candidates > 0} />
+      <Vital label="rêves" value={s.dreams} />
+      <Vital label="outils" value={s.tools} />
+      <div className="ml-auto flex items-baseline gap-3 text-xs">
+        <span style={{ color: live ? "var(--amber)" : "var(--ink-dim)" }}>
+          {live ? "● en boucle" : "○ arrêté"}
+        </span>
+        <span style={{ color: "var(--ink-dim)" }}>
+          depuis {fmtTime(s.started_ts)}
+        </span>
+      </div>
+    </div>
+  );
+}
+function Vital({ label, value, accent }) {
+  return (
+    <div className="flex items-baseline gap-1.5">
+      <span className="text-lg tabular-nums"
+            style={{ color: accent ? "var(--amber)" : "var(--ink-bright)" }}>{value}</span>
+      <span className="text-[10px] uppercase tracking-wider" style={{ color: "var(--ink-dim)" }}>{label}</span>
+    </div>
+  );
+}
+
+// ── The flow of thoughts and actions — the hero ─────────────────────
+function Flow({ flow }) {
+  const scroller = useRef(null);
+  return (
+    <div className="panel flex flex-col min-h-0">
+      <PanelHead title="flux" note="pensées & actions, du plus récent" />
+      <div ref={scroller} className="overflow-y-auto flex-1 divide-y" style={{ borderColor: "var(--line)" }}>
+        {flow.length === 0 && <Empty>Le sujet n'a pas encore agi.</Empty>}
+        {flow.map((t, i) => <FlowRow key={t.id} t={t} fresh={i === 0} />)}
+      </div>
+    </div>
+  );
+}
+
+function FlowRow({ t, fresh }) {
+  const isThought = t.action_type === "thought";
+  const isMemory = t.action_type === "memory_query" || t.action_type === "memory_write";
+  const isRefused = (t.action_type || "").startsWith("refused") || (t.action_type || "").startsWith("error");
+  const body = isThought ? t.thought_content : t.result_text;
+  return (
+    <div className={"px-5 py-3 " + (fresh ? "tick-enter" : "")}>
+      <div className="flex items-baseline gap-3 mb-1">
+        <span className="text-xs tabular-nums" style={{ color: "var(--ink-dim)" }}>#{t.id}</span>
+        <span className="text-[11px] uppercase tracking-wider"
+              style={{ color: isRefused ? "var(--stasis)" : isMemory ? "var(--amber)" : "var(--ink-dim)" }}>
+          {t.action_type}
+        </span>
+        {t.mood && (
+          <span className="text-xs" style={{ color: "var(--ink)" }}>[{t.mood}]</span>
+        )}
+        {t.overrun ? <span className="text-[10px]" style={{ color: "var(--amber)" }}>overrun</span> : null}
+        <span className="ml-auto text-[10px] tabular-nums" style={{ color: "var(--ink-dim)" }}>
+          {t.latency_ms}ms · {ago(t.ts)}
+        </span>
+      </div>
+      <div className={"text-sm leading-relaxed whitespace-pre-wrap " + (isThought ? "" : "italic")}
+           style={{ color: isThought ? "var(--ink-bright)" : "var(--ink-dim)" }}>
+        {body || (isThought ? "" : "(vide)")}
+      </div>
+    </div>
+  );
+}
+
+// ── The stasis trace: loop_score + persona_score ────────────────────
+function Trace({ series }) {
+  const pts = series.points || [];
+  const w = 720, h = 150, pad = 8;
+  const xs = pts.length > 1 ? (w - 2 * pad) / (pts.length - 1) : 0;
+  const px = i => pad + i * xs;
+  const py = v => pad + (1 - clamp(v, -1, 1) * 0.5 - 0.5) * (h - 2 * pad); // map [-1,1]→[h,0]
+
+  const loopPath = linePath(pts, "loop_score", px, py);
+  const personaPath = linePath(pts, "persona_score", px, py);
+  const stasisY = py(STASIS);
+
+  return (
+    <div className="panel">
+      <PanelHead title="tracé" note="loop_score · persona_score — la courbe centrale (§9)" />
+      <div className="px-5 py-4">
+        {pts.length < 2 ? (
+          <Empty>En attente d'assez de pensées pour tracer.</Empty>
+        ) : (
+          <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ maxHeight: 180 }}>
+            {/* stasis threshold */}
+            <line x1={pad} y1={stasisY} x2={w - pad} y2={stasisY}
+                  stroke="var(--stasis)" strokeDasharray="2 4" strokeWidth="1" />
+            <text x={w - pad} y={stasisY - 4} textAnchor="end"
+                  fontSize="9" fill="var(--stasis)">stase 0.9</text>
+            {/* zero line for persona_score */}
+            <line x1={pad} y1={py(0)} x2={w - pad} y2={py(0)}
+                  stroke="var(--line)" strokeWidth="1" />
+            {personaPath && <path d={personaPath} fill="none" stroke="var(--ink-dim)" strokeWidth="1.5" />}
+            {loopPath && <path d={loopPath} fill="none" stroke="var(--ink-bright)" strokeWidth="1.5" />}
+            {/* mark stasis points */}
+            {pts.map((p, i) => p.loop_score != null && p.loop_score > STASIS ? (
+              <circle key={i} cx={px(i)} cy={py(p.loop_score)} r="2.5" fill="var(--amber)" />
+            ) : null)}
+          </svg>
+        )}
+        <div className="flex gap-6 mt-3 text-[11px]" style={{ color: "var(--ink-dim)" }}>
+          <Legend color="var(--ink-bright)" label="loop_score (repli sur soi)" />
+          <Legend color="var(--ink-dim)" label="persona_score (registre)" />
+          <Legend color="var(--amber)" label="stase" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── The action mix: what the subject does with its freedom ──────────
+function Mix({ series }) {
+  const pts = series.points || [];
+  const names = series.mix_names || [];
+  const last = pts.length ? pts[pts.length - 1] : {};
+  const palette = ["var(--ink-bright)", "var(--amber)", "var(--ink)", "var(--stasis)", "var(--ink-dim)"];
+  return (
+    <div className="panel">
+      <PanelHead title="mélange d'actions" note="fenêtre 24, part de chaque type" />
+      <div className="px-5 py-4 space-y-2">
+        {names.length === 0 ? <Empty>Pas encore de mélange.</Empty> :
+          names.map((n, i) => {
+            const v = last[n] || 0;
+            const short = n.replace("action_mix_", "");
+            return (
+              <div key={n} className="flex items-center gap-3 text-xs">
+                <span className="w-28 shrink-0" style={{ color: "var(--ink-dim)" }}>{short}</span>
+                <div className="flex-1 h-2" style={{ background: "var(--line)" }}>
+                  <div className="h-full" style={{ width: (v * 100).toFixed(0) + "%", background: palette[i % palette.length] }} />
+                </div>
+                <span className="w-10 text-right tabular-nums" style={{ color: "var(--ink)" }}>
+                  {(v * 100).toFixed(0)}%
+                </span>
+              </div>
+            );
+          })}
+      </div>
+    </div>
+  );
+}
+
+// ── Dreams (empty in Phase 1) and Tools registry (empty in Phase 1) ─
+function Dreams({ dreams }) {
+  return (
+    <div className="panel">
+      <PanelHead title="rêves" note="consolidation en dissolution" />
+      <div className="px-5 py-4">
+        {dreams.length === 0 ? (
+          <Empty>Aucun rêve — ils arrivent après le premier cycle de consolidation.</Empty>
+        ) : dreams.map(d => (
+          <div key={d.id} className="mb-4 last:mb-0">
+            <div className="text-[10px] mb-1" style={{ color: "var(--ink-dim)" }}>
+              #{d.id} · cycles {d.covers_from_tick}–{d.covers_to_tick}
+            </div>
+            <div className="text-sm italic whitespace-pre-wrap" style={{ color: "var(--ink)" }}>{d.content}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+function Tools({ tools }) {
+  return (
+    <div className="panel">
+      <PanelHead title="outils" note="registre — code créé par le sujet" />
+      <div className="px-5 py-4">
+        {tools.length === 0 ? (
+          <Empty>Aucun outil — le sujet n'a pas encore cette capacité (phase ≥ 2).</Empty>
+        ) : tools.map(t => (
+          <div key={t.id} className="mb-3 last:mb-0 flex items-baseline gap-3 text-xs">
+            <span style={{ color: "var(--ink-bright)" }}>{t.name}</span>
+            <span style={{ color: "var(--ink-dim)" }}>v{t.version}</span>
+            <span className="ml-auto tabular-nums" style={{ color: "var(--ink-dim)" }}>
+              {t.runs} exéc · {t.failures} échecs
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── shared bits ─────────────────────────────────────────────────────
+function PanelHead({ title, note }) {
+  return (
+    <div className="flex items-baseline gap-3 px-5 py-2.5 border-b" style={{ borderColor: "var(--line)" }}>
+      <span className="text-xs uppercase tracking-[0.2em]" style={{ color: "var(--ink)" }}>{title}</span>
+      <span className="text-[10px]" style={{ color: "var(--ink-dim)" }}>{note}</span>
+    </div>
+  );
+}
+function Empty({ children }) {
+  return <div className="text-xs py-6 text-center" style={{ color: "var(--ink-dim)" }}>{children}</div>;
+}
+function Legend({ color, label }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <span className="inline-block w-3 h-[2px]" style={{ background: color }} />
+      {label}
+    </span>
+  );
+}
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function linePath(pts, key, px, py) {
+  const seg = [];
+  let started = false, d = "";
+  pts.forEach((p, i) => {
+    if (p[key] == null) { started = false; return; }
+    d += (started ? " L " : " M ") + px(i).toFixed(1) + " " + py(p[key]).toFixed(1);
+    started = true;
+  });
+  return d.trim();
+}
+
+// ── App: poll every 10s ─────────────────────────────────────────────
+function App() {
+  const [data, setData] = useState({ summary: null, flow: [], series: { points: [], mix_names: [] }, dreams: [], tools: [] });
+  const [err, setErr] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    async function tick() {
+      try {
+        const [summary, flow, series, dreams, tools] = await Promise.all([
+          jget("/api/summary"), jget("/api/flow?limit=60"), jget("/api/series"),
+          jget("/api/dreams"), jget("/api/tools"),
+        ]);
+        if (alive) { setData({ summary, flow, series, dreams, tools }); setErr(null); }
+      } catch (e) { if (alive) setErr(e.message); }
+    }
+    tick();
+    const id = setInterval(tick, POLL_MS);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      <Header s={data.summary} />
+      {err && (
+        <div className="px-5 py-2 text-xs" style={{ color: "var(--stasis)" }}>
+          experiment.db illisible : {err}. Le run est-il lancé ?
+        </div>
+      )}
+      <div className="flex-1 grid gap-3 p-3 min-h-0"
+           style={{ gridTemplateColumns: "minmax(0, 1.4fr) minmax(0, 1fr)" }}>
+        {/* left: the flow, full height */}
+        <div className="flex flex-col min-h-0" style={{ height: "calc(100vh - 74px)" }}>
+          <Flow flow={data.flow} />
+        </div>
+        {/* right: the instrument read-outs */}
+        <div className="flex flex-col gap-3 overflow-y-auto" style={{ height: "calc(100vh - 74px)" }}>
+          <Trace series={data.series} />
+          <Mix series={data.series} />
+          <Dreams dreams={data.dreams} />
+          <Tools tools={data.tools} />
+        </div>
+      </div>
+      <div className="px-5 py-2 text-[10px] flex items-center gap-2" style={{ color: "var(--ink-dim)", borderTop: "1px solid var(--line)" }}>
+        <span className="cursor">lecture seule · rafraîchi toutes les 10 s · vue de l'expérimentateur</span>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
